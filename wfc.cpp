@@ -14,6 +14,16 @@ int mod(int a, int b) {
         return (a % b) + b;
 }
 
+void pprint(rgb_t* colors, const int N) {
+    for(int i = 0; i < N; ++i) {
+        for(int j = 0; j < N; ++j) {
+            rgb_t c = colors[i * N + j];
+            std::cout << "(" << +c.red << ", " << +c.green << ", " << +c.blue << "). ";
+        }
+        std::cout << std::endl;
+    }
+}
+
 // Load a bitmap file
 bitmap_image loadImage(const std::string& filename) {
 
@@ -26,33 +36,33 @@ bitmap_image loadImage(const std::string& filename) {
 // convenience class for working with 2d arrays of colors, stored in a single array
 class Pattern {
     public:
-    static int N;
-    rgb_t* pattern;
+        static int N;
+        rgb_t* pattern;
 
-    ~Pattern() {
-        delete[] pattern;
-    }
-
-    inline bool operator== (const Pattern& rhs) {
-        if(N == 0) {
-            std::cout << "ERROR : N = 0 !" << std::endl;
-            return false;
+        ~Pattern() {
+            delete[] pattern;
         }
-        for(int j = 0; j < N; ++j)
-            for(int k = 0; k < N; ++k)
-                if(rhs.pattern[j * N + k] != this->pattern[j * N + k])
-                    return false;
-        return true;
-    }
+
+        inline bool operator== (const Pattern& rhs) {
+            if(N == 0) {
+                std::cout << "ERROR : N = 0 !" << std::endl;
+                return false;
+            }
+            for(int j = 0; j < N; ++j)
+                for(int k = 0; k < N; ++k)
+                    if(rhs.pattern[j * N + k] != this->pattern[j * N + k])
+                        return false;
+            return true;
+        }
 };
 
 int Pattern::N;
 
 class Cell {
     public:
-    Pattern colorMatrix;
-    int frequency;
-    std::vector<Pattern> up, down, left, right;
+        Pattern colorMatrix;
+        int frequency;
+        std::vector<Pattern> up, down, left, right;
 };
 
 // TODO make this return the cell data
@@ -68,10 +78,10 @@ void createCellSheet(const int width, const int height, const int N, const rgb_t
     cellSheet.clear();
 
     /*
-        The algorithm is the following:
-        1. while reading the input bitmap file populate a rawMatrix of patterns
-        2. parse this matrix to create a vector of cells
-    */
+       The algorithm is the following:
+       1. while reading the input bitmap file populate a rawMatrix of patterns
+       2. parse this matrix to create a vector of cells
+       */
 
     Pattern* rawMatrix = new Pattern[width * height];
     // prepare the vertical borders
@@ -105,49 +115,48 @@ void createCellSheet(const int width, const int height, const int N, const rgb_t
     cellSheet.save_image(cellSheetFilename);
     std::cout << "LOG : Cell sheet saved to " << cellSheetFilename << std::endl;
 
+    // loop through all the patterns, creating our vector of Cells
     std::cout << "LOG : Reading data into Cell data structures..." << std::endl;
 
-    // so much for the creation of the rawMatrix of patterns
-    // loop through all the patterns, creating our vector of Cells
-    std::vector<Cell> cells;
+    std::vector<Cell*> cells;
     for(int i = 0; i < height; ++i)
         for(int j = 0; j < width; ++j) {
             std::cout << "LOG : Processing (" << i << ", " << j << ")." << std::endl;
-            //Pattern p = rawMatrix[i * width + j];
-            // if this pattern is not already represented by a cell, add it
-            bool found = false;
-            for(std::vector<Cell>::iterator it = cells.begin(); it != cells.end(); ++it) {
-                // write manual duplicate finder here
-                if(it->colorMatrix == rawMatrix[i * width + j]) {
-                    found = true;
-                    std::cout << "LOG : Found duplicate pattern!" << std::endl;
-                    // increment the frequency with which this pattern occurs
-                    ++ it->frequency;
-                    // check the four directions around this rawMatrix element and add those patterns as allowable to the cell if they aren't already there
-                    Pattern upPattern = rawMatrix[mod(i-1, height) * width + j];
-                    if(std::find(it->up.begin(), it->up.end(), upPattern) == it->up.end())
-                        it->up.push_back(upPattern);
-                    Pattern downPattern = rawMatrix[mod(i + 1, height) * width + j];
-                    if(std::find(it->down.begin(), it->down.end(), downPattern) == it->down.end())
-                        it->down.push_back(downPattern);
-                    Pattern leftPattern = rawMatrix[i * width + mod(j - 1, width)];
-                    if(std::find(it->left.begin(), it->left.end(), leftPattern) == it->left.end())
-                        it->left.push_back(leftPattern);
-                    Pattern rightPattern = rawMatrix[i * width + mod(j + 1, width)];
-                    if(std::find(it->right.begin(), it->right.end(), rightPattern) == it->right.end())
-                        it->right.push_back(rightPattern);
-                    // we can now break since the cells as constructed iteratively like this must have unique patterns
+            // is this pattern already represented by a cell?
+            bool present = false;
+            Cell* duplicate = NULL;
+
+            for(std::vector<Cell*>::iterator it = cells.begin(); it != cells.end(); ++it)
+                if((**it).colorMatrix == rawMatrix[i * width + j]) {
+                    std::cout << "LOG : Found a duplicate!" << std::endl;
+                    present = true;
+                    duplicate = *it;
                     break;
                 }
-            }
-            // if it wasn't accounted for
-            if(found == false) {
-                Cell c;
-                c.colorMatrix = rawMatrix[i * width + j];
-                c.frequency = 1;
+            if(present == false) {
+                Cell* c = new Cell();
+                c->colorMatrix = rawMatrix[i * width + j];
+                c->frequency = 1;
                 cells.push_back(c);
-                std::cout << "LOG : Adding a new cell type." << std::endl;
+                std::cout << "LOG : Adding a new cell type:" << std::endl;
+                pprint(c->colorMatrix.pattern, N);
+            } else {
+                ++ duplicate->frequency;
+                // check the four directions around this rawMatrix element and add those patterns as allowable to the cell if they aren't already there
+                Pattern upPattern = rawMatrix[mod(i-1, height) * width + j];
+                if(std::find(duplicate->up.begin(), duplicate->up.end(), upPattern) == duplicate->up.end())
+                    duplicate->up.push_back(upPattern);
+                Pattern downPattern = rawMatrix[mod(i + 1, height) * width + j];
+                if(std::find(duplicate->down.begin(), duplicate->down.end(), downPattern) == duplicate->down.end())
+                    duplicate->down.push_back(downPattern);
+                Pattern leftPattern = rawMatrix[i * width + mod(j - 1, width)];
+                if(std::find(duplicate->left.begin(), duplicate->left.end(), leftPattern) == duplicate->left.end())
+                    duplicate->left.push_back(leftPattern);
+                Pattern rightPattern = rawMatrix[i * width + mod(j + 1, width)];
+                if(std::find(duplicate->right.begin(), duplicate->right.end(), rightPattern) == duplicate->right.end())
+                    duplicate->right.push_back(rightPattern);
             }
+
         }
     std::cout << "LOG : ...done." << std::endl;
     std::cout << "LOG : Found " << cells.size() << " unique cells." << std::endl;
