@@ -39,6 +39,28 @@ class Pattern {
         static int N;
         rgb_t* pattern;
 
+        Pattern() {
+            this->pattern = new rgb_t[N * N];
+        }
+
+        // copy constructor
+        // can we just call the assignment constructor from here?
+        Pattern(const Pattern &other) {
+            std::cout << "LOG : In Pattern copy constructor!" << std::endl;
+            Pattern();
+            for(int j = 0; j < N; ++j)
+                for(int k = 0; k < N; ++k)
+                    this->pattern[j * N + k] = other.pattern[j * N + k];
+        }
+
+        // assignment operator
+        Pattern& operator=(const Pattern &other) {
+            for(int j = 0; j < N; ++j)
+                for(int k = 0; k < N; ++k)
+                    this->pattern[j * N + k] = other.pattern[j * N + k];
+            return *this;
+        }
+
         ~Pattern() {
             delete[] pattern;
         }
@@ -54,8 +76,11 @@ class Pattern {
                         return false;
             return true;
         }
+
+
 };
 
+// Why do I need this...?
 int Pattern::N;
 
 class Cell {
@@ -63,6 +88,19 @@ class Cell {
         Pattern colorMatrix;
         int frequency;
         std::vector<Pattern> up, down, left, right;
+    
+    // empty constructor
+    Cell() = default;
+
+    // copy constructor
+    Cell(const Cell &other) {
+        this->colorMatrix = other.colorMatrix;
+        this->frequency = other.frequency;
+        this->up = up;
+        this->down = down;
+        this->left = left;
+        this->right = right;
+    }
 };
 
 // TODO make this return the cell data
@@ -114,11 +152,10 @@ void createCellSheet(const int width, const int height, const int N, const rgb_t
         }
     cellSheet.save_image(cellSheetFilename);
     std::cout << "LOG : Cell sheet saved to " << cellSheetFilename << std::endl;
-
     // loop through all the patterns, creating our vector of Cells
     std::cout << "LOG : Reading data into Cell data structures..." << std::endl;
 
-    std::vector<Cell*> cells;
+    std::vector<Cell> cells;
     for(int i = 0; i < height; ++i)
         for(int j = 0; j < width; ++j) {
             std::cout << "LOG : Processing (" << i << ", " << j << ")." << std::endl;
@@ -126,26 +163,26 @@ void createCellSheet(const int width, const int height, const int N, const rgb_t
             bool present = false;
             Cell* duplicate = NULL;
 
-            for(std::vector<Cell*>::iterator it = cells.begin(); it != cells.end(); ++it)
-                if((**it).colorMatrix == rawMatrix[i * width + j]) {
+            for(std::vector<Cell>::iterator it = cells.begin(); it != cells.end(); ++it)
+                if((*it).colorMatrix == rawMatrix[i * width + j]) {
                     std::cout << "LOG : Found a duplicate!" << std::endl;
                     present = true;
-                    duplicate = *it;
+                    duplicate = &(*it);
                     break;
                 }
             if(present == false) {
-                Cell* c = new Cell();
-                c->colorMatrix = rawMatrix[i * width + j];
-                c->frequency = 1;
+                Cell c;
+                c.colorMatrix = rawMatrix[i * width + j];
+                c.frequency = 1;
                 cells.push_back(c);
                 std::cout << "LOG : Adding a new cell type:" << std::endl;
-                pprint(c->colorMatrix.pattern, N);
             } else {
                 ++ duplicate->frequency;
                 // check the four directions around this rawMatrix element and add those patterns as allowable to the cell if they aren't already there
-                Pattern upPattern = rawMatrix[mod(i-1, height) * width + j];
+                /*Pattern upPattern = rawMatrix[mod(i - 1, height) * width + j];
                 if(std::find(duplicate->up.begin(), duplicate->up.end(), upPattern) == duplicate->up.end())
                     duplicate->up.push_back(upPattern);
+                /*
                 Pattern downPattern = rawMatrix[mod(i + 1, height) * width + j];
                 if(std::find(duplicate->down.begin(), duplicate->down.end(), downPattern) == duplicate->down.end())
                     duplicate->down.push_back(downPattern);
@@ -155,6 +192,7 @@ void createCellSheet(const int width, const int height, const int N, const rgb_t
                 Pattern rightPattern = rawMatrix[i * width + mod(j + 1, width)];
                 if(std::find(duplicate->right.begin(), duplicate->right.end(), rightPattern) == duplicate->right.end())
                     duplicate->right.push_back(rightPattern);
+                */
             }
 
         }
