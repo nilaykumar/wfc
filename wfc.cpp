@@ -14,16 +14,6 @@ int mod(int a, int b) {
         return (a % b) + b;
 }
 
-void pprint(rgb_t* colors, const int N) {
-    for(int i = 0; i < N; ++i) {
-        for(int j = 0; j < N; ++j) {
-            rgb_t c = colors[i * N + j];
-            std::cout << "(" << +c.red << ", " << +c.green << ", " << +c.blue << "). ";
-        }
-        std::cout << std::endl;
-    }
-}
-
 // Load a bitmap file
 bitmap_image loadImage(const std::string& filename) {
 
@@ -74,22 +64,29 @@ class Pattern {
         }
 
         inline bool operator== (const Pattern& rhs) {
-            if(N == 0) {
-                std::cout << "ERROR : N = 0 !" << std::endl;
-                return false;
-            }
             for(int j = 0; j < N; ++j)
                 for(int k = 0; k < N; ++k)
                     if(rhs.pattern[j * N + k] != this->pattern[j * N + k])
                         return false;
             return true;
         }
-
-
+        
 };
 
 // Why do I need this...?
 int Pattern::N;
+
+std::ostream& operator<<(std::ostream& stream, const Pattern& p) {
+    stream << "Pattern{ ";
+    for(int i = 0; i < Pattern::N; ++i) {
+        for(int j = 0; j < Pattern::N; ++j)
+            stream << "(" << +(p.pattern[i * Pattern::N + j].red) << ", " << +(p.pattern[i * Pattern::N + j].green) << ", " << +(p.pattern[i * Pattern::N + j].blue) << ") ";
+        if(i != Pattern::N - 1)
+            stream << "  //  ";
+    }
+    stream << "}";
+    return stream;
+}
 
 class Cell {
     public:
@@ -104,15 +101,25 @@ class Cell {
     Cell(const Cell &other) {
         this->colorMatrix = other.colorMatrix;
         this->frequency = other.frequency;
-        this->up = up;
-        this->down = down;
-        this->left = left;
-        this->right = right;
+        this->up = other.up;
+        this->down = other.down;
+        this->left = other.left;
+        this->right = other.right;
     }
+
 };
 
-// TODO make this return the cell data
-void createCellSheet(const int width, const int height, const int N, const rgb_t borderColor, bitmap_image inputImage, const std::string cellSheetFilename) {
+std::ostream& operator<<(std::ostream &stream, const Cell &cell) {
+    stream << "Cell{ \n\t" << cell.colorMatrix << "\n\tFrequency{ " << cell.frequency << " }\n";
+    stream << "\tUp{ " << cell.up.size() << " }\n";
+    stream << "\tDown{ " << cell.down.size() << " }\n";
+    stream << "\tLeft{ " << cell.left.size() << " }\n";
+    stream << "\tRight{ " << cell.right.size() << " }\n";
+    stream << "}";
+    return stream;
+}
+
+std::vector<Cell> createCellSheet(const int width, const int height, const int N, const rgb_t borderColor, bitmap_image inputImage, const std::string cellSheetFilename) {
     // Write a large bitmap containing every cell type
     // The cell types are separated by a 1px black border
     // and are N x N pixels wide.
@@ -177,11 +184,18 @@ void createCellSheet(const int width, const int height, const int N, const rgb_t
                     duplicate = &(*it);
                     break;
                 }
+            // if this pattern hasn't been seen before, introduce it, and its neighboring patterns
             if(present == false) {
                 Cell c;
                 c.colorMatrix = rawMatrix[i * width + j];
                 c.frequency = 1;
+                c.up.push_back(rawMatrix[mod(i - 1, height) * width + j]);
+                c.down.push_back(rawMatrix[mod(i + 1, height) * width + j]);
+                c.left.push_back(rawMatrix[i * width + mod(j - 1, width)]);
+                c.right.push_back(rawMatrix[i * width + mod(j + 1, width)]);
                 cells.push_back(c);
+                std::cout << "LOG: Found new cell at (" << i << ", " << j << ")." << std::endl;
+                //std::cout << c << std::endl;
             } else {
                 ++ duplicate->frequency;
                 // check the four directions around this rawMatrix element and add those patterns as allowable to the cell if they aren't already there
@@ -197,12 +211,15 @@ void createCellSheet(const int width, const int height, const int N, const rgb_t
                 Pattern rightPattern = rawMatrix[i * width + mod(j + 1, width)];
                 if(std::find(duplicate->right.begin(), duplicate->right.end(), rightPattern) == duplicate->right.end())
                     duplicate->right.push_back(rightPattern);
+                //std::cout << "LOG: Found duplicate cell at (" << i << ", " << j << ")." << std::endl;
+                //std::cout << *duplicate << std::endl;
             }
-
         }
     std::cout << "LOG : ...done." << std::endl;
     std::cout << "LOG : Found " << cells.size() << " unique cells." << std::endl;
     delete[] rawMatrix;
+
+    return cells;
 }
 
 int main() {
@@ -236,7 +253,9 @@ int main() {
     // Number of (overlapping) NxN cells
     //const int numCells = height * width;
 
-    createCellSheet(width, height, N, borderColor, inputImage, cellSheetFilename);
+    std::vector<Cell> cellTypes = createCellSheet(width, height, N, borderColor, inputImage, cellSheetFilename);
+    for(Cell c : cellTypes)
+        std::cout << c << std::endl;
 
     return 0;
 }
